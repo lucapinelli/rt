@@ -75,12 +75,12 @@ impl Arguments {
     }
 }
 
-fn get_name(path: &Path) -> String {
+fn get_name(path: &Path) -> Result<(String), Box<dyn Error>> {
     match path.file_name() {
-        Some(name) => name.to_str().unwrap().to_string(),
-        None => match path.canonicalize().unwrap().file_name() {
-            Some(name) => name.to_str().unwrap().to_string(),
-            None => path.canonicalize().unwrap().to_str().unwrap().to_string(),
+        Some(name) => Ok(name.to_str().ok_or("")?.to_string()),
+        None => match path.canonicalize()?.file_name() {
+            Some(name) => Ok(name.to_str().ok_or("")?.to_string()),
+            None => Ok(path.canonicalize()?.to_str().ok_or("")?.to_string()),
         },
     }
 }
@@ -91,33 +91,34 @@ fn visit_path(
     max_level: u32,
     style: &String,
     hidden: bool,
-) -> std::io::Result<()> {
-    if !hidden && get_name(&path).starts_with('.') {
+) -> Result<(), Box<dyn Error>> {
+    if !hidden && get_name(&path)?.starts_with('.') {
         return Ok(());
     }
-    print_item(&path, level, style);
+    print_item(&path, level, style)?;
     if max_level != 0 && level >= max_level {
         return Ok(());
     }
     if path.is_dir() {
         for entry in fs::read_dir(path)? {
-            visit_path(&entry.unwrap().path(), level + 1, max_level, style, hidden)?;
+            visit_path(&entry?.path(), level + 1, max_level, style, hidden)?;
         }
     }
     Ok(())
 }
 
-fn print_item(path: &Path, level: u32, style: &String) {
+fn print_item(path: &Path, level: u32, style: &String) -> Result<(), Box<dyn Error>> {
     let item = if style == "absolute" {
-        path.canonicalize().unwrap().to_str().unwrap().to_string()
+        path.canonicalize()?.to_str().ok_or("--")?.to_string()
     } else if style == "relative" {
-        path.to_str().unwrap().to_string()
+        path.to_str().ok_or("--")?.to_string()
     } else {
         let mut pad: String = format!("{: >level$}* ", "", level = (level * 2) as usize);
-        pad.push_str(&get_name(path));
+        pad.push_str(&get_name(path)?);
         pad
     };
     println!("{}", &item);
+    Ok(())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -133,7 +134,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         eprintln!("{}", HELP);
         process::exit(1);
     }
-    visit_path(&path, 0, levels, &style, hidden).unwrap();
+    visit_path(&path, 0, levels, &style, hidden)?;
 
     Ok(())
 }
