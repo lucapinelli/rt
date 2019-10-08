@@ -13,7 +13,7 @@ Params:
     path                       the path to explore
     levels=NUMBER,l=NUMBER     the number of levels to explore
     style=TEXT,s=TEXT          the node style. Available style are:
-                               name     -- show just the name of the item
+                               name     -- show just the name of the item in  a tree view
                                relative -- show the relative path of the item
                                absolute -- show the absolute path of the item
     hidden=BOOLEAN,h=BOOLEAN   if true we will show hidden item (dafault: false)
@@ -121,6 +121,14 @@ impl Tree {
         }
     }
 
+    fn get_relative_path(&self, path: &Path) -> Result<(String), Box<dyn Error>> {
+        Ok(path.to_str().ok_or("--")?.to_string())
+    }
+
+    fn get_absolute_path(&self, path: &Path) -> Result<(String), Box<dyn Error>> {
+        Ok(path.canonicalize()?.to_str().ok_or("--")?.to_string())
+    }
+
     fn visit_path(&self, path: &Path, level: u32) -> Result<(), Box<dyn Error>> {
         let Arguments {
             path: _path,
@@ -151,12 +159,12 @@ impl Tree {
 
     fn print_item(&self, path: &Path, level: u32, style: &String) -> Result<(), Box<dyn Error>> {
         let item = if style == "absolute" {
-            path.canonicalize()?.to_str().ok_or("--")?.to_string()
+            self.get_absolute_path(path)?
         } else if style == "relative" {
-            path.to_str().ok_or("--")?.to_string()
+            self.get_relative_path(path)?
         } else {
             let mut pad: String = format!("{: >level$}* ", "", level = (level * 2) as usize);
-            pad.push_str(&&self.get_name(path)?);
+            pad.push_str(&self.get_name(path)?);
             pad
         };
         println!("{}", &item);
