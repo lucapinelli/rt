@@ -19,7 +19,16 @@ Params:
     hidden=BOOLEAN,h=BOOLEAN   if true we will show hidden item (dafault: false)
     dev=BOOLEAN,d=BOOLEAN      if true standard development folders and files are discarded
                                (.git, target, node_modules, build, bin)
+    tab=NUMBER,t=NUMBER        the number of spaces used to indent the tree (default is 2)
 ";
+
+fn parse_arg(arg: &String, arg_prefix: &'static str, abbreviation: &'static str) -> String {
+    if arg.starts_with(abbreviation) {
+        arg[abbreviation.len()..].to_string()
+    } else {
+        arg[arg_prefix.len()..].to_string()
+    }
+}
 
 #[derive(Debug, Clone)]
 struct Arguments {
@@ -28,7 +37,9 @@ struct Arguments {
     style: String,
     hidden: bool,
     development: bool,
+    tab: u32,
 }
+
 impl Arguments {
     fn new(args: &Vec<String>) -> Result<Arguments, Box<dyn Error>> {
         let mut path = String::from("");
@@ -36,44 +47,34 @@ impl Arguments {
         let mut style = String::from("");
         let mut hidden = false;
         let mut development = false;
+        let mut tab: u32 = 0;
         if args.len() < 1 {
             eprintln!("{}", HELP);
             process::exit(1);
         }
         for arg in args {
             if arg.starts_with("levels=") || arg.starts_with("l=") {
-                let value = if arg.starts_with("l=") {
-                    &arg[2..]
-                } else {
-                    &arg[7..]
-                };
-                levels = value
-                    .parse()
-                    .expect("\"levels\" must be a valid number (u32).");
+                levels = match parse_arg(arg, "levels=", "l=").parse() {
+                    Ok(s) => Ok(s),
+                    Err(_e) => Err("\"levels\" must be a valid number (u32)."),
+                }?
             } else if arg.starts_with("style=") || arg.starts_with("s=") {
-                style = if arg.starts_with("s=") {
-                    arg[2..].to_string()
-                } else {
-                    arg[6..].to_string()
-                };
+                style = parse_arg(arg, "style=", "s=");
             } else if arg.starts_with("hidden=") || arg.starts_with("h=") {
-                let value = if arg.starts_with("h=") {
-                    &arg[2..]
-                } else {
-                    &arg[7..]
-                };
-                hidden = value
-                    .parse()
-                    .expect("\"hidden\" must be \"true\" or \"false\".");
+                hidden = match parse_arg(arg, "hidden=", "h=").parse() {
+                    Ok(s) => Ok(s),
+                    Err(_e) => Err("\"hidden\" must be \"true\" or \"false\"."),
+                }?
             } else if arg.starts_with("development=") || arg.starts_with("d=") {
-                let value = if arg.starts_with("d=") {
-                    &arg[2..]
-                } else {
-                    &arg[12..]
-                };
-                development = value
-                    .parse()
-                    .expect("\"development\" must be \"true\" or \"false\".");
+                development = match parse_arg(arg, "development=", "d=").parse() {
+                    Ok(s) => Ok(s),
+                    Err(_e) => Err("\"development\" must be \"true\" or \"false\"."),
+                }?
+            } else if arg.starts_with("tab=") || arg.starts_with("t=") {
+                tab = match parse_arg(arg, "tab=", "t=").parse() {
+                    Ok(s) => Ok(s),
+                    Err(_e) => Err("\"tab\" must be a positive integer number (u32)."),
+                }?
             } else if path.is_empty() {
                 path = arg.to_string();
             } else {
@@ -87,6 +88,7 @@ impl Arguments {
             style,
             hidden,
             development,
+            tab,
         })
     }
 }
@@ -122,11 +124,11 @@ impl Tree {
     }
 
     fn get_relative_path(&self, path: &Path) -> Result<(String), Box<dyn Error>> {
-        Ok(path.to_str().ok_or("--")?.to_string())
+        Ok(path.to_str().ok_or("-??-")?.to_string())
     }
 
     fn get_absolute_path(&self, path: &Path) -> Result<(String), Box<dyn Error>> {
-        Ok(path.canonicalize()?.to_str().ok_or("--")?.to_string())
+        Ok(path.canonicalize()?.to_str().ok_or("-??-")?.to_string())
     }
 
     fn visit_path(&self, path: &Path, level: u32) -> Result<(), Box<dyn Error>> {
@@ -136,6 +138,7 @@ impl Tree {
             style,
             hidden,
             development,
+            tab,
         } = &self.options;
 
         let name = self.get_name(&path)?;
@@ -145,7 +148,7 @@ impl Tree {
         if *development && self.dev_excludes.contains(&name) {
             return Ok(());
         }
-        self.print_item(&path, level, &style)?;
+        self.print_item(&path, level, &style, *tab)?;
         if *max_level != 0 as u32 && level >= *max_level {
             return Ok(());
         }
@@ -157,13 +160,20 @@ impl Tree {
         Ok(())
     }
 
-    fn print_item(&self, path: &Path, level: u32, style: &String) -> Result<(), Box<dyn Error>> {
+    fn print_item(
+        &self,
+        path: &Path,
+        level: u32,
+        style: &String,
+        tab: u32,
+    ) -> Result<(), Box<dyn Error>> {
         let item = if style == "absolute" {
             self.get_absolute_path(path)?
         } else if style == "relative" {
             self.get_relative_path(path)?
         } else {
-            let mut pad: String = format!("{: >level$}* ", "", level = (level * 2) as usize);
+            let spaces = if tab > 0 { tab } else { 2 };
+            let mut pad: String = format!("{: >level$}* ", "", level = (level * spaces) as usize);
             pad.push_str(&self.get_name(path)?);
             pad
         };
@@ -172,15 +182,24 @@ impl Tree {
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn run() -> Result<(), Box<dyn Error>> {
     let arguments = Arguments::new(&env::args().skip(1).collect())?;
     let path = Path::new(&arguments.path);
     if !path.exists() {
-        eprintln!("\nERROR: the specified path does not reference to any file or directory.\n");
-        eprintln!("{}", HELP);
-        process::exit(1);
+        Err("the specified path does not reference to any file or directory.")?
     }
     let tree = Tree::new(&arguments);
     tree.visit_path(path, 0)?;
     Ok(())
+}
+
+fn main() {
+    match run() {
+        Ok(some) => some,
+        Err(e) => {
+            eprintln!("\nERROR: {}\n", e);
+            eprintln!("{}", HELP);
+            process::exit(1);
+        },
+    }
 }
