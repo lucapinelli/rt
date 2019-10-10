@@ -18,7 +18,6 @@ Params:
     tab=NUMBER,t=NUMBER        the number of spaces used to indent the tree (default is 2)
 ";
 
-
 fn parse_arg(arg: &String, arg_prefix: &'static str, abbreviation: &'static str) -> String {
     if arg.starts_with(abbreviation) {
         arg[abbreviation.len()..].to_string()

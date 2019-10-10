@@ -26,6 +26,6 @@ fn main() {
             eprintln!("\nERROR: {}\n", e);
             eprintln!("{}", HELP);
             process::exit(1);
-        },
+        }
     }
 }
