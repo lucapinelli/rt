@@ -5,7 +5,6 @@ use std::process;
 
 mod util;
 use crate::util::arguments::Arguments;
-use crate::util::arguments::HELP;
 use crate::util::core::Core;
 
 fn run() -> Result<(), Box<dyn Error>> {
@@ -24,7 +23,6 @@ fn main() {
         Ok(some) => some,
         Err(e) => {
             eprintln!("\nERROR: {}\n", e);
-            eprintln!("{}", HELP);
             process::exit(1);
         }
     }

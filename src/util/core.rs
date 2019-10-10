@@ -51,6 +51,7 @@ impl Core {
             hidden,
             development,
             tab,
+            exclude,
         } = &self.options;
 
         let name = self.get_name(&path)?;
@@ -60,6 +61,10 @@ impl Core {
         if *development && self.dev_excludes.contains(&name) {
             return Ok(());
         }
+        if exclude.is_some() && exclude.as_ref().unwrap().is_match(&name) {
+            return Ok(());
+        }
+        
         self.print_item(&path, level, &style, *tab)?;
         if *max_level != 0 as u32 && level >= *max_level {
             return Ok(());
