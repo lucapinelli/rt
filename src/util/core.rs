@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::util::arguments::Arguments;
+use crate::util::arguments::Style;
 
 #[derive(Debug)]
 pub struct Core {
@@ -52,6 +53,7 @@ impl Core {
             development,
             tab,
             exclude,
+            include,
         } = &self.options;
 
         let name = self.get_name(&path)?;
@@ -64,8 +66,12 @@ impl Core {
         if exclude.is_some() && exclude.as_ref().unwrap().is_match(&name) {
             return Ok(());
         }
-        
-        self.print_item(&path, level, &style, *tab)?;
+
+        if include.is_some() {
+            self.print_item(&path, level, &style, *tab)?;
+        } else {
+            self.print_item(&path, level, &style, *tab)?;
+        }
         if *max_level != 0 as u32 && level >= *max_level {
             return Ok(());
         }
@@ -81,18 +87,18 @@ impl Core {
         &self,
         path: &Path,
         level: u32,
-        style: &String,
+        style: &Style,
         tab: u32,
     ) -> Result<(), Box<dyn Error>> {
-        let item = if style == "absolute" {
-            self.get_absolute_path(path)?
-        } else if style == "relative" {
-            self.get_relative_path(path)?
-        } else {
-            let spaces = if tab > 0 { tab } else { 2 };
-            let mut pad: String = format!("{: >level$}* ", "", level = (level * spaces) as usize);
-            pad.push_str(&self.get_name(path)?);
-            pad
+        let item = match style {
+            Style::ABSOLUTE => self.get_absolute_path(path)?,
+            Style::RELATIVE => self.get_relative_path(path)?,
+            Style::NAME => {
+                let spaces = if tab > 0 { tab } else { 2 };
+                let mut pad = format!("{: >level$}* ", "", level = (level * spaces) as usize);
+                pad.push_str(&self.get_name(path)?);
+                pad
+            }
         };
         println!("{}", &item);
         Ok(())

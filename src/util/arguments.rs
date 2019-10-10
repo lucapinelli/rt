@@ -1,6 +1,7 @@
 use regex::Regex;
 use std::error::Error;
 use std::process;
+use std::str::FromStr;
 
 static HELP: &'static str = "\
 Usage:
@@ -18,9 +19,9 @@ Params:
                                (.git, target, node_modules, build, bin)
     tab=NUMBER,t=NUMBER        the number of spaces used to indent the tree (default is 2)
     exclude=REGEX,e=REGEX      the items to show doesn't have to match the 'exclude' pattern
+    incude=REGEX,i=REGEX       the items to show (or one of their descendant if the style is
+                               name) have to match the 'include' pattern
 ";
-// incude=REGEX,i=REGEX       the items to show (or one of their descendant) have to match
-//                            the 'include' pattern
 
 fn parse_arg(arg: &String, arg_prefix: &'static str, abbreviation: &'static str) -> String {
     if arg.starts_with(abbreviation) {
@@ -30,26 +31,49 @@ fn parse_arg(arg: &String, arg_prefix: &'static str, abbreviation: &'static str)
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum Style {
+    NAME,
+    RELATIVE,
+    ABSOLUTE,
+}
+
+impl FromStr for Style {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "name" => return Ok(Style::NAME),
+            "relative" => return Ok(Style::RELATIVE),
+            "absolute" => return Ok(Style::ABSOLUTE),
+            _ => Err(String::from(
+                "Expected one of the following values: name, relative or absolute",
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Arguments {
     pub levels: u32,
     pub path: String,
-    pub style: String,
+    pub style: Style,
     pub hidden: bool,
     pub development: bool,
     pub tab: u32,
     pub exclude: Option<Regex>,
+    pub include: Option<Regex>,
 }
 
 impl Arguments {
     pub fn new(args: &Vec<String>) -> Result<Arguments, Box<dyn Error>> {
         let mut path = String::from("");
         let mut levels = 0;
-        let mut style = String::from("");
+        let mut style = Style::NAME;
         let mut hidden = false;
         let mut development = false;
         let mut tab: u32 = 0;
         let mut exclude = Option::None;
+        let mut include = Option::None;
         if args.len() < 1 {
             eprintln!("{}", HELP);
             process::exit(1);
@@ -61,7 +85,12 @@ impl Arguments {
                     Err(_e) => Err("\"levels\" must be a valid number (u32)."),
                 }?
             } else if arg.starts_with("style=") || arg.starts_with("s=") {
-                style = parse_arg(arg, "style=", "s=");
+                style = match parse_arg(arg, "style=", "s=").parse() {
+                    Ok(s) => Ok(s),
+                    Err(_e) => {
+                        Err("\"style\" must be one of: \"name\" or \"relative\" or \"absolute\".")
+                    }
+                }?
             } else if arg.starts_with("hidden=") || arg.starts_with("h=") {
                 hidden = match parse_arg(arg, "hidden=", "h=").parse() {
                     Ok(s) => Ok(s),
@@ -87,6 +116,14 @@ impl Arguments {
                         e
                     )),
                 }?)
+            } else if arg.starts_with("include=") || arg.starts_with("i=") {
+                include = Option::Some(match Regex::new(&parse_arg(arg, "include=", "i=")) {
+                    Ok(s) => Ok(s),
+                    Err(e) => Err(format!(
+                        "\"include\" must be a valid regular expression: {}",
+                        e
+                    )),
+                }?)
             } else {
                 eprintln!("{}", HELP);
                 process::exit(1);
@@ -100,6 +137,21 @@ impl Arguments {
             development,
             tab,
             exclude,
+            include,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_style_from_str() {
+        assert_eq!("name".parse(), Ok(Style::NAME));
+        assert_eq!("relative".parse(), Ok(Style::RELATIVE));
+        assert_eq!("absolute".parse(), Ok(Style::ABSOLUTE));
+        assert!("invalid".parse::<Style>().is_err())
     }
 }
