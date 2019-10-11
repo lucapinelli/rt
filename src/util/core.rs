@@ -68,7 +68,22 @@ impl Core {
         }
 
         if include.is_some() {
-            self.print_item(&path, level, &style, *tab)?;
+            let regex = include.as_ref().unwrap();
+            if *style == Style::RELATIVE {
+                if regex.is_match(&self.get_relative_path(path)?) {
+                    self.print_item(&path, level, &style, *tab)?;
+                }
+            } else if *style == Style::ABSOLUTE {
+                if regex.is_match(&self.get_absolute_path(path)?) {
+                    self.print_item(&path, level, &style, *tab)?;
+                }
+            } else {
+                if path.is_dir() {
+                    self.print_item(&path, level, &style, *tab)?;
+                } else if regex.is_match(&self.get_name(path)?) {
+                    self.print_item(&path, level, &style, *tab)?;
+                }
+            }
         } else {
             self.print_item(&path, level, &style, *tab)?;
         }
