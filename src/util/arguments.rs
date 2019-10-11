@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 static HELP: &'static str = "\
 Usage:
-    minitree <path> [...options]
+    rt <path> [...options]
 
 Params:
     path                       the path to explore
@@ -78,6 +78,10 @@ impl Arguments {
             eprintln!("{}", HELP);
             process::exit(1);
         }
+        if args.len() == 1 && (args[0] == "--help" || args[0] == "-help" || args[0] == "-h") {
+            eprintln!("{}", HELP);
+            process::exit(0);
+        }
         for arg in args {
             if arg.starts_with("levels=") || arg.starts_with("l=") {
                 levels = match parse_arg(arg, "levels=", "l=").parse() {
@@ -128,6 +132,10 @@ impl Arguments {
                 eprintln!("{}", HELP);
                 process::exit(1);
             }
+        }
+        if path == "" {
+            eprintln!("{}", HELP);
+            process::exit(1);
         }
         Ok(Arguments {
             path,
