@@ -4,6 +4,11 @@ version = "0.1.0"
 authors = ["Luca Pinelli <pinelli.luca@gmail.com>"]
 edition = "2018"
 
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
