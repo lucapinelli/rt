@@ -1,29 +1,21 @@
-use std::env;
-use std::error::Error;
+use quicli::prelude::*;
 use std::path::Path;
-use std::process;
+use structopt::StructOpt;
+use std::str::FromStr;
 
 mod util;
-use crate::util::arguments::Arguments;
+use crate::util::cli::Cli;
 use crate::util::core::Core;
 
-fn run() -> Result<(), Box<dyn Error>> {
-    let arguments = Arguments::new(&env::args().skip(1).collect())?;
-    let path = Path::new(&arguments.path);
-    if !path.exists() {
-        Err("the specified path does not reference to any file or directory.")?
-    }
-    let tree = Core::new(&arguments);
-    tree.visit_path(path, 0)?;
-    Ok(())
-}
+fn main() -> CliResult {
+    let args = Cli::from_args();
+    args.verbosity.setup_env_logger("head")?;
 
-fn main() {
-    match run() {
-        Ok(some) => some,
-        Err(e) => {
-            eprintln!("\nERROR: {}\n", e);
-            process::exit(1);
-        }
+    let path = Path::new(&args.path);
+    if !path.exists() {
+        error!("the specified path does not reference to any file or directory.")
     }
+    let tree = Core::new(&args);
+    // tree.visit_path(path, 0)?;
+    Ok(())
 }

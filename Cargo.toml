@@ -13,3 +13,5 @@ opt-level = "z"
 
 [dependencies]
 regex = "1"
+quicli = "0.4"
+structopt = "0.2"
